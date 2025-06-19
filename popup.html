@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { width: 260px; padding: 15px; font-family: system-ui, sans-serif; }
+    .header { text-align: center; margin-bottom: 16px; color: #1da1f2; font-weight: 600; }
+    .toggle-container { display: flex; justify-content: space-between; align-items: center; }
+    .toggle { position: relative; width: 46px; height: 22px; background: #ccc; border-radius: 22px; cursor: pointer; transition: background 0.3s; }
+    .toggle.active { background: #1da1f2; }
+    .toggle-slider { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: transform 0.3s; }
+    .toggle.active .toggle-slider { transform: translateX(24px); }
+    .status { text-align: center; font-size: 12px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">X Auto Scroll</div>
+
+  <div class="toggle-container">
+    <span>Enable Auto Scroll</span>
+    <div class="toggle" id="enableToggle" role="switch" aria-checked="true"><div class="toggle-slider"></div></div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
