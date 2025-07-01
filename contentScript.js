@@ -41,8 +41,8 @@
     }
   };
 
-  // click banner or smooth‑scroll
-  const clickBannerOrScroll = () => {
+  // smooth scroll only
+  const scrollToTop = () => {
     const now = Date.now();
     if (now - lastHandled < 10_000) {
       console.log('[X Auto Scroll] Debounced - too soon since last action');
@@ -51,43 +51,9 @@
     lastHandled = now;
 
     playBeep();
+    console.log('playBeep() called');
 
-    const bannerSelectors = [
-      'div[data-testid="cellInnerDiv"] button[role="button"]',
-      'div[data-testid="cellInnerDiv"] button',
-      'div[role="button"][data-testid="cellInnerDiv"]',
-      'div[role="button"][aria-label*="See new"]', 
-      'div[role="button"][data-testid="toast"]',
-      '[data-testid="pillLabel"]'
-    ];
-    
-    let bannerBtn = null;
-    for (const selector of bannerSelectors) {
-      bannerBtn = document.querySelector(selector);
-      if (bannerBtn) {
-        console.log('[X Auto Scroll] Found banner with selector:', selector, bannerBtn);
-        break;
-      }
-    }
-    
-    if (!bannerBtn) {
-      // Try to find any button containing "Show" or "posts"
-      const allButtons = document.querySelectorAll('div[role="button"]');
-      for (const btn of allButtons) {
-        const text = btn.textContent.toLowerCase();
-        if (text.includes('show') && text.includes('post')) {
-          bannerBtn = btn;
-          console.log('[X Auto Scroll] Found banner by text content:', btn);
-          break;
-        }
-      }
-    }
-    if (bannerBtn) {
-      console.log('[X Auto Scroll] Found banner button, clicking:', bannerBtn);
-      bannerBtn.click();
-      return;
-    }
-    console.log('[X Auto Scroll] No banner found, scrolling to top');
+    console.log('[X Auto Scroll] Scrolling to top');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -126,8 +92,26 @@
       }
       const hasNewNodes = muts.some((m) => m.addedNodes.length);
       if (hasNewNodes) {
-        console.log('[X Auto Scroll] New nodes detected, triggering action');
-        clickBannerOrScroll();
+        // Check if there's a "Show X posts" element
+        const showPostsElement = document.querySelector('span');
+        let foundShowPosts = false;
+        
+        if (showPostsElement) {
+          const allSpans = document.querySelectorAll('span');
+          for (const span of allSpans) {
+            const text = span.textContent;
+            if (text && /^Show \d+ posts?$/.test(text.trim())) {
+              console.log('[X Auto Scroll] Found "Show X posts" element:', text);
+              foundShowPosts = true;
+              break;
+            }
+          }
+        }
+        
+        if (foundShowPosts) {
+          console.log('[X Auto Scroll] New posts detected, triggering action');
+          scrollToTop();
+        }
       }
     });
     observer.observe(timeline, { childList: true, subtree: true });

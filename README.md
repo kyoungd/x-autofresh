@@ -14,3 +14,9 @@ Hands‑free utility that **reveals new tweets without reloading X/Twitter tabs*
 4. Click **Load unpacked** and select the folder.
 
 That’s it — open `x.com/home` and watch new tweets surface automatically!
+
+
+
+Show 2 posts
+
+<div dir="ltr" class="css-146c3p1 r-bcqeeo r-qvutc0 r-37j5jr r-q4m81j r-a023e6 r-rjixqe r-16dba41" style="color: rgb(29, 155, 240);"><span class="css-1jxf684 r-bcqeeo r-1ttztb7 r-qvutc0 r-poiln3">Show 2 posts</span></div>
