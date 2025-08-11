@@ -1,7 +1,53 @@
 (() => {
-  console.log('[X Auto Scroll] Content script loaded');
+  console.log('[X Auto Scroll] Content script loaded on:', window.location.href);
+  console.log('[X Auto Scroll] Document ready state:', document.readyState);
+  console.log('[X Auto Scroll] Page title:', document.title);
+  
+  // Send status messages to service worker
+  const sendStatusMessage = (type, data = {}) => {
+    console.log(`[X Auto Scroll] Sending message: ${type}`, data);
+    chrome.runtime.sendMessage({
+      type: type,
+      data: data
+    }).then(response => {
+      console.log('[X Auto Scroll] Message sent successfully:', response);
+    }).catch(e => {
+      console.log('[X Auto Scroll] Failed to send message:', e);
+    });
+  };
+  
+  // Send initial status
+  console.log('[X Auto Scroll] Sending initial status message...');
+  sendStatusMessage('STATUS_UPDATE', { 
+    status: '🚀 Content script ACTIVE on Twitter/X page', 
+    details: { 
+      url: window.location.href,
+      title: document.title,
+      ready: true,
+      timestamp: new Date().toISOString()
+    }
+  });
   let observer = null;
   let lastHandled = 0;  // 10‑second debounce for scroll action
+
+  // play alert sound from file
+  const playAlert = () => {
+    try {
+      const audio = new Audio(chrome.runtime.getURL('alert.mp3'));
+      audio.volume = 0.7;
+      audio.play()
+        .then(() => {
+          sendStatusMessage('ALERT_PLAYED', { success: true });
+        })
+        .catch(e => {
+          console.log('[X Auto Scroll] Alert audio failed:', e);
+          sendStatusMessage('ALERT_PLAYED', { success: false, error: e.message });
+        });
+    } catch (e) {
+      console.log('[X Auto Scroll] Alert audio creation failed:', e);
+      sendStatusMessage('ALERT_PLAYED', { success: false, error: e.message });
+    }
+  };
 
   // play beep sound - try multiple methods
   const playBeep = () => {
@@ -39,6 +85,112 @@
     } catch (e) {
       console.log('[X Auto Scroll] Speech synthesis beep failed:', e);
     }
+  };
+
+  // click on "Show X posts" button
+  const clickShowPosts = () => {
+    console.log('[X Auto Scroll] Searching for "Show X posts" button...');
+    
+    // Method 1: Look for spans with "Show X post" text
+    const allSpans = document.querySelectorAll('span');
+    console.log(`[X Auto Scroll] Found ${allSpans.length} span elements to check`);
+    
+    let foundMessage = null;
+    
+    for (const span of allSpans) {
+      const text = span.textContent;
+      if (text && /^Show \d+ posts?$/.test(text.trim())) {
+        foundMessage = text.trim();
+        console.log('[X Auto Scroll] ✅ FOUND "Show X posts" message:', foundMessage);
+        
+        try {
+          // Look for the button parent (should be role="button")
+          let clickTarget = span;
+          let parent = span.parentElement;
+          
+          while (parent && parent !== document.body) {
+            if (parent.getAttribute('role') === 'button' || parent.tagName === 'BUTTON') {
+              clickTarget = parent;
+              console.log('[X Auto Scroll] Found clickable parent:', parent.tagName, parent.getAttribute('role'));
+              break;
+            }
+            parent = parent.parentElement;
+          }
+          
+          console.log('[X Auto Scroll] Attempting to click:', clickTarget.tagName);
+          clickTarget.click();
+          console.log('[X Auto Scroll] ✅ Successfully clicked "Show X posts" button');
+          
+          sendStatusMessage('SHOW_POSTS_CLICKED', { 
+            text: foundMessage,
+            success: true,
+            clickedElement: clickTarget.tagName,
+            hasRole: clickTarget.getAttribute('role')
+          });
+          
+          return true;
+        } catch (error) {
+          console.log('[X Auto Scroll] ❌ Failed to click "Show X posts" button:', error);
+          
+          sendStatusMessage('SHOW_POSTS_CLICKED', { 
+            text: foundMessage,
+            success: false,
+            error: error.message
+          });
+          
+          return false;
+        }
+      }
+    }
+    
+    // Method 2: Look specifically for buttons with data-testid="cellInnerDiv" parent
+    const cellDivs = document.querySelectorAll('[data-testid="cellInnerDiv"]');
+    console.log(`[X Auto Scroll] Found ${cellDivs.length} cellInnerDiv elements to check`);
+    
+    for (const cellDiv of cellDivs) {
+      const spans = cellDiv.querySelectorAll('span');
+      for (const span of spans) {
+        const text = span.textContent;
+        if (text && /^Show \d+ posts?$/.test(text.trim())) {
+          foundMessage = text.trim();
+          console.log('[X Auto Scroll] ✅ FOUND "Show X posts" in cellInnerDiv:', foundMessage);
+          
+          const button = cellDiv.querySelector('button[role="button"]');
+          if (button) {
+            try {
+              button.click();
+              console.log('[X Auto Scroll] ✅ Successfully clicked cellInnerDiv button');
+              
+              sendStatusMessage('SHOW_POSTS_CLICKED', { 
+                text: foundMessage,
+                success: true,
+                clickedElement: 'BUTTON',
+                method: 'cellInnerDiv'
+              });
+              
+              return true;
+            } catch (error) {
+              console.log('[X Auto Scroll] ❌ Failed to click cellInnerDiv button:', error);
+            }
+          }
+        }
+      }
+    }
+    
+    console.log('[X Auto Scroll] ⚪ No "Show X posts" message found');
+    return false;
+  };
+
+  // check for "pokemon center queue" text
+  const checkForPokemonQueue = () => {
+    const bodyText = document.body.textContent || document.body.innerText || '';
+    if (bodyText.toLowerCase().includes('pokemon center queue')) {
+      console.log('[X Auto Scroll] Found "pokemon center queue" - playing alert');
+      sendStatusMessage('POKEMON_QUEUE_DETECTED', { timestamp: new Date().toISOString() });
+      playAlert();
+      return true;
+    }
+    return false;
   };
 
   // smooth scroll only
@@ -124,13 +276,66 @@
     rearmTO = setTimeout(armObserver, 500);  // wait 0.5 s for DOM stabilize
   }).observe(document.body, { childList: true, subtree: true });
 
+  // Interval check every 10 seconds for "Show X posts" and "pokemon center queue"
+  let intervalCheck;
+  const startIntervalCheck = () => {
+    if (intervalCheck) clearInterval(intervalCheck);
+    intervalCheck = setInterval(() => {
+      if (document.hidden) {
+        console.log('[X Auto Scroll] Document hidden, skipping interval check');
+        return;
+      }
+      
+      // Check for pokemon center queue first
+      const foundPokemon = checkForPokemonQueue();
+      
+      // Then check for and click "Show X posts"
+      const clicked = clickShowPosts();
+      
+      // Send interval check status
+      sendStatusMessage('INTERVAL_CHECK', { 
+        foundPokemon: foundPokemon,
+        clickedShowPosts: clicked,
+        timestamp: new Date().toISOString(),
+        checkedForShowPosts: true
+      });
+      
+      if (clicked) {
+        console.log('[X Auto Scroll] Clicked "Show X posts" during interval check');
+      }
+    }, 10000); // 10 seconds
+  };
+
+  const stopIntervalCheck = () => {
+    if (intervalCheck) {
+      clearInterval(intervalCheck);
+      intervalCheck = null;
+    }
+  };
+
+  // Test button detection immediately
+  const testButtonDetection = () => {
+    console.log('[X Auto Scroll] Testing button detection...');
+    setTimeout(() => {
+      console.log('[X Auto Scroll] Running immediate test for "Show X posts" button');
+      const found = clickShowPosts();
+      if (!found) {
+        console.log('[X Auto Scroll] No "Show X posts" button found in immediate test');
+      }
+    }, 2000); // Wait 2 seconds for page to load
+  };
+
   // Initial arm
   chrome.storage.sync.get({ isEnabled: true }, (s) => {
     console.log('[X Auto Scroll] Storage check - isEnabled:', s.isEnabled);
     if (s.isEnabled) {
       armObserver();
+      startIntervalCheck();
+      testButtonDetection(); // Test immediately
+      sendStatusMessage('EXTENSION_ENABLED');
     } else {
       console.log('[X Auto Scroll] Extension disabled, not arming observer');
+      sendStatusMessage('EXTENSION_DISABLED');
     }
   });
 
@@ -144,9 +349,13 @@
         console.log('[X Auto Scroll] Disabling observer');
         observer.disconnect();
         observer = null;
+        stopIntervalCheck();
+        sendStatusMessage('EXTENSION_DISABLED');
       } else if (s.isEnabled) {
         console.log('[X Auto Scroll] Enabling observer');
         armObserver();
+        startIntervalCheck();
+        sendStatusMessage('EXTENSION_ENABLED');
       }
     });
   });

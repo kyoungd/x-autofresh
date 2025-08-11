@@ -3,7 +3,10 @@
   "name": "X Auto Scroll",
   "version": "2.3",
   "description": "Automatically reveals new tweets on X/Twitter with zero page reloads.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "tabs"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -25,5 +28,11 @@
   "icons": {
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["alert.mp3"],
+      "matches": ["https://twitter.com/*", "https://x.com/*"]
+    }
+  ]
 }
