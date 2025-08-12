@@ -29,6 +29,50 @@
   });
   let observer = null;
   let lastHandled = 0;  // 10‑second debounce for scroll action
+  let keepAliveInterval = null;
+
+  // Random number generator helper
+  const randomBetween = (min, max) => Math.random() * (max - min) + min;
+
+  // Keep-alive micro scroll (1 pixel every 3-5 minutes)
+  const keepAliveScroll = () => {
+    const currentY = window.pageYOffset;
+    const direction = Math.random() > 0.5 ? 1 : -1; // Random direction
+    const newY = Math.max(0, currentY + direction);
+    
+    window.scrollTo(0, newY);
+    console.log(`[X Auto Scroll] Keep-alive micro scroll: ${direction > 0 ? 'down' : 'up'} 1px`);
+    
+    sendStatusMessage('KEEP_ALIVE_SCROLL', { 
+      direction: direction > 0 ? 'down' : 'up',
+      position: newY
+    });
+  };
+
+  // Start random keep-alive scrolling
+  const startKeepAlive = () => {
+    const scheduleNextKeepAlive = () => {
+      const nextInterval = randomBetween(3 * 60 * 1000, 5 * 60 * 1000); // 3-5 minutes in ms
+      console.log(`[X Auto Scroll] Next keep-alive scroll in ${Math.round(nextInterval / 60000)} minutes`);
+      
+      keepAliveInterval = setTimeout(() => {
+        if (!document.hidden) {
+          keepAliveScroll();
+        }
+        scheduleNextKeepAlive(); // Schedule the next one
+      }, nextInterval);
+    };
+    
+    scheduleNextKeepAlive();
+  };
+
+  const stopKeepAlive = () => {
+    if (keepAliveInterval) {
+      clearTimeout(keepAliveInterval);
+      keepAliveInterval = null;
+      console.log('[X Auto Scroll] Keep-alive scrolling stopped');
+    }
+  };
 
   // play alert sound from file
   const playAlert = () => {
@@ -276,20 +320,21 @@
     rearmTO = setTimeout(armObserver, 500);  // wait 0.5 s for DOM stabilize
   }).observe(document.body, { childList: true, subtree: true });
 
-  // Interval check every 10 seconds for "Show X posts" and "pokemon center queue"
+  // Simple interval check without scrolling
   let intervalCheck;
   const startIntervalCheck = () => {
     if (intervalCheck) clearInterval(intervalCheck);
+    
     intervalCheck = setInterval(() => {
       if (document.hidden) {
         console.log('[X Auto Scroll] Document hidden, skipping interval check');
         return;
       }
       
-      // Check for pokemon center queue first
+      // Check for pokemon center queue
       const foundPokemon = checkForPokemonQueue();
       
-      // Then check for and click "Show X posts"
+      // Check for and click "Show X posts"
       const clicked = clickShowPosts();
       
       // Send interval check status
@@ -301,7 +346,7 @@
       });
       
       if (clicked) {
-        console.log('[X Auto Scroll] Clicked "Show X posts" during interval check');
+        console.log('[X Auto Scroll] ✅ Clicked "Show X posts" during interval check');
       }
     }, 10000); // 10 seconds
   };
@@ -331,6 +376,7 @@
     if (s.isEnabled) {
       armObserver();
       startIntervalCheck();
+      startKeepAlive(); // Start keep-alive scrolling
       testButtonDetection(); // Test immediately
       sendStatusMessage('EXTENSION_ENABLED');
     } else {
@@ -350,11 +396,13 @@
         observer.disconnect();
         observer = null;
         stopIntervalCheck();
+        stopKeepAlive();
         sendStatusMessage('EXTENSION_DISABLED');
       } else if (s.isEnabled) {
         console.log('[X Auto Scroll] Enabling observer');
         armObserver();
         startIntervalCheck();
+        startKeepAlive();
         sendStatusMessage('EXTENSION_ENABLED');
       }
     });

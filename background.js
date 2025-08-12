@@ -95,6 +95,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       break;
 
+    case 'KEEP_ALIVE_SCROLL':
+      log(`💓 Keep-alive scroll on tab ${tabId}: ${message.data.direction} 1px`, {
+        position: message.data.position
+      });
+      break;
+
     default:
       log('Unknown message type', { type: message.type, data: message.data });
   }
