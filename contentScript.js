@@ -278,13 +278,37 @@
 
   // check for "pokemon center queue" text
   const checkForPokemonQueue = () => {
-    const bodyText = document.body.textContent || document.body.innerText || '';
-    if (bodyText.toLowerCase().includes('pokemon center queue')) {
-      console.log('[X Auto Scroll] Found "pokemon center queue" - playing alert');
-      sendStatusMessage('POKEMON_QUEUE_DETECTED', { timestamp: new Date().toISOString() });
-      playAlert();
-      return true;
+    // Find all div elements with translateY transform (these are the info panels)
+    const panels = Array.from(document.querySelectorAll('div[data-testid="cellInnerDiv"]'))
+      .filter(div => {
+        const style = div.getAttribute('style');
+        return style && style.includes('transform: translateY(');
+      })
+      .map(div => {
+        const style = div.getAttribute('style');
+        const match = style.match(/translateY\((\d+(?:\.\d+)?)px\)/);
+        return {
+          element: div,
+          translateY: match ? parseFloat(match[1]) : Infinity
+        };
+      })
+      .sort((a, b) => a.translateY - b.translateY)
+      .slice(0, 3); // Only check first 3 panels (lowest translateY values)
+
+    // Check for "pokemon center queue" in the first 3 panels only
+    for (const panel of panels) {
+      const panelText = panel.element.textContent || panel.element.innerText || '';
+      if (panelText.toLowerCase().includes('pokemon center queue')) {
+        console.log(`[X Auto Scroll] Found "pokemon center queue" in panel at translateY(${panel.translateY}px) - playing alert`);
+        sendStatusMessage('POKEMON_QUEUE_DETECTED', { 
+          timestamp: new Date().toISOString(),
+          panelPosition: panel.translateY 
+        });
+        playAlert();
+        return true;
+      }
     }
+    
     return false;
   };
 
