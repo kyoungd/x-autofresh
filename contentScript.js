@@ -38,10 +38,10 @@
   const isWithinActiveHours = () => {
     const now = new Date();
     
-    // Convert to PST (UTC-8)
-    const pstTime = new Date(now.getTime() - (8 * 60 * 60 * 1000));
-    const hours = pstTime.getUTCHours();
-    const minutes = pstTime.getUTCMinutes();
+    // Convert to Pacific Time (handles PST/PDT automatically)
+    const pacificTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
+    const hours = pacificTime.getHours();
+    const minutes = pacificTime.getMinutes();
     
     // 8:00 AM - 12:00 PM PST (8-12 hours)
     const morningSession = hours >= 8 && hours < 12;
@@ -53,7 +53,7 @@
     
     // Log time info occasionally
     if (Math.random() < 0.1) { // 10% chance to log
-      console.log(`[X Auto Scroll] PST Time: ${pstTime.getUTCHours()}:${pstTime.getUTCMinutes().toString().padStart(2, '0')} - ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+      console.log(`[X Auto Scroll] Pacific Time: ${hours}:${minutes.toString().padStart(2, '0')} - ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
     }
     
     return isActive;
@@ -61,21 +61,21 @@
 
   const getNextActiveTime = () => {
     const now = new Date();
-    const pstTime = new Date(now.getTime() - (8 * 60 * 60 * 1000));
-    const hours = pstTime.getUTCHours();
-    const minutes = pstTime.getUTCMinutes();
+    const pacificTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
+    const hours = pacificTime.getHours();
+    const minutes = pacificTime.getMinutes();
     
     // If before 8 AM, next active is 8 AM today
     if (hours < 8) {
-      return "8:00 AM PST";
+      return "8:00 AM PT";
     }
     // If between 12 PM and 1 PM, next active is 1 PM today
     else if (hours === 12 || (hours === 13 && minutes === 0)) {
-      return "1:00 PM PST";
+      return "1:00 PM PT";
     }
     // If after 3:30 PM, next active is 8 AM tomorrow
     else if (hours > 15 || (hours === 15 && minutes > 30)) {
-      return "8:00 AM PST tomorrow";
+      return "8:00 AM PT tomorrow";
     }
     // Otherwise we're currently active
     else {
