@@ -77,7 +77,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'EXTENSION_ENABLED':
-      log(`Extension enabled on tab ${tabId}`);
+      if (message.data && message.data.timeActive !== undefined) {
+        const timeStatus = message.data.timeActive ? '✅ ACTIVE HOURS' : '❌ INACTIVE HOURS';
+        const nextTime = message.data.timeActive ? '' : ` (Next: ${message.data.nextActiveTime})`;
+        log(`Extension enabled on tab ${tabId} - ${timeStatus}${nextTime}`);
+      } else {
+        log(`Extension enabled on tab ${tabId}`);
+      }
       break;
 
     case 'EXTENSION_DISABLED':
@@ -85,14 +91,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       break;
 
     case 'INTERVAL_CHECK':
-      const pokemonStatus = message.data.foundPokemon ? '🚨 Pokemon found!' : '';
-      const showPostsStatus = message.data.clickedShowPosts ? '✅ Clicked "Show posts"' : '⚪ No "Show posts" found';
-      
-      log(`🔍 10s Check on tab ${tabId}: ${showPostsStatus} ${pokemonStatus}`.trim(), {
-        foundPokemon: message.data.foundPokemon,
-        clickedShowPosts: message.data.clickedShowPosts,
-        timestamp: message.data.timestamp
-      });
+      if (message.data.inactiveHours) {
+        log(`⏰ INACTIVE HOURS - Next active: ${message.data.nextActiveTime}`, {
+          timestamp: message.data.timestamp
+        });
+      } else {
+        const pokemonStatus = message.data.foundPokemon ? '🚨 Pokemon found!' : '';
+        const showPostsStatus = message.data.clickedShowPosts ? '✅ Clicked "Show posts"' : '⚪ No "Show posts" found';
+        
+        log(`🔍 10s Check on tab ${tabId}: ${showPostsStatus} ${pokemonStatus}`.trim(), {
+          foundPokemon: message.data.foundPokemon,
+          clickedShowPosts: message.data.clickedShowPosts,
+          timestamp: message.data.timestamp
+        });
+      }
       break;
 
     case 'KEEP_ALIVE_SCROLL':

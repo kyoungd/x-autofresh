@@ -34,6 +34,55 @@
   // Random number generator helper
   const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
+  // Time-based activation helper
+  const isWithinActiveHours = () => {
+    const now = new Date();
+    
+    // Convert to PST (UTC-8)
+    const pstTime = new Date(now.getTime() - (8 * 60 * 60 * 1000));
+    const hours = pstTime.getUTCHours();
+    const minutes = pstTime.getUTCMinutes();
+    
+    // 8:00 AM - 12:00 PM PST (8-12 hours)
+    const morningSession = hours >= 8 && hours < 12;
+    
+    // 1:00 PM - 3:30 PM PST (13:00-15:30)
+    const afternoonSession = hours === 13 || hours === 14 || (hours === 15 && minutes <= 30);
+    
+    const isActive = morningSession || afternoonSession;
+    
+    // Log time info occasionally
+    if (Math.random() < 0.1) { // 10% chance to log
+      console.log(`[X Auto Scroll] PST Time: ${pstTime.getUTCHours()}:${pstTime.getUTCMinutes().toString().padStart(2, '0')} - ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+    }
+    
+    return isActive;
+  };
+
+  const getNextActiveTime = () => {
+    const now = new Date();
+    const pstTime = new Date(now.getTime() - (8 * 60 * 60 * 1000));
+    const hours = pstTime.getUTCHours();
+    const minutes = pstTime.getUTCMinutes();
+    
+    // If before 8 AM, next active is 8 AM today
+    if (hours < 8) {
+      return "8:00 AM PST";
+    }
+    // If between 12 PM and 1 PM, next active is 1 PM today
+    else if (hours === 12 || (hours === 13 && minutes === 0)) {
+      return "1:00 PM PST";
+    }
+    // If after 3:30 PM, next active is 8 AM tomorrow
+    else if (hours > 15 || (hours === 15 && minutes > 30)) {
+      return "8:00 AM PST tomorrow";
+    }
+    // Otherwise we're currently active
+    else {
+      return "Active now";
+    }
+  };
+
   // Keep-alive micro scroll (1 pixel every 3-5 minutes)
   const keepAliveScroll = () => {
     const currentY = window.pageYOffset;
@@ -49,15 +98,17 @@
     });
   };
 
-  // Start random keep-alive scrolling
+  // Start random keep-alive scrolling (only during active hours)
   const startKeepAlive = () => {
     const scheduleNextKeepAlive = () => {
       const nextInterval = randomBetween(3 * 60 * 1000, 5 * 60 * 1000); // 3-5 minutes in ms
       console.log(`[X Auto Scroll] Next keep-alive scroll in ${Math.round(nextInterval / 60000)} minutes`);
       
       keepAliveInterval = setTimeout(() => {
-        if (!document.hidden) {
+        if (!document.hidden && isWithinActiveHours()) {
           keepAliveScroll();
+        } else if (!isWithinActiveHours()) {
+          console.log(`[X Auto Scroll] Skipping keep-alive: outside active hours`);
         }
         scheduleNextKeepAlive(); // Schedule the next one
       }, nextInterval);
@@ -320,7 +371,7 @@
     rearmTO = setTimeout(armObserver, 500);  // wait 0.5 s for DOM stabilize
   }).observe(document.body, { childList: true, subtree: true });
 
-  // Simple interval check without scrolling
+  // Time-aware interval check
   let intervalCheck;
   const startIntervalCheck = () => {
     if (intervalCheck) clearInterval(intervalCheck);
@@ -328,6 +379,22 @@
     intervalCheck = setInterval(() => {
       if (document.hidden) {
         console.log('[X Auto Scroll] Document hidden, skipping interval check');
+        return;
+      }
+      
+      // Check if we're within active hours
+      if (!isWithinActiveHours()) {
+        const nextActive = getNextActiveTime();
+        console.log(`[X Auto Scroll] Outside active hours. Next active: ${nextActive}`);
+        
+        sendStatusMessage('INTERVAL_CHECK', { 
+          foundPokemon: false,
+          clickedShowPosts: false,
+          timestamp: new Date().toISOString(),
+          checkedForShowPosts: false,
+          inactiveHours: true,
+          nextActiveTime: nextActive
+        });
         return;
       }
       
@@ -342,7 +409,8 @@
         foundPokemon: foundPokemon,
         clickedShowPosts: clicked,
         timestamp: new Date().toISOString(),
-        checkedForShowPosts: true
+        checkedForShowPosts: true,
+        inactiveHours: false
       });
       
       if (clicked) {
@@ -370,15 +438,26 @@
     }, 2000); // Wait 2 seconds for page to load
   };
 
-  // Initial arm
+  // Initial arm with time check
   chrome.storage.sync.get({ isEnabled: true }, (s) => {
     console.log('[X Auto Scroll] Storage check - isEnabled:', s.isEnabled);
+    
+    // Show current time status
+    const isActive = isWithinActiveHours();
+    const nextActive = getNextActiveTime();
+    console.log(`[X Auto Scroll] Time status: ${isActive ? 'ACTIVE' : 'INACTIVE'}${!isActive ? ` (Next: ${nextActive})` : ''}`);
+    
     if (s.isEnabled) {
       armObserver();
       startIntervalCheck();
       startKeepAlive(); // Start keep-alive scrolling
-      testButtonDetection(); // Test immediately
-      sendStatusMessage('EXTENSION_ENABLED');
+      if (isActive) {
+        testButtonDetection(); // Test immediately only if active
+      }
+      sendStatusMessage('EXTENSION_ENABLED', { 
+        timeActive: isActive, 
+        nextActiveTime: nextActive 
+      });
     } else {
       console.log('[X Auto Scroll] Extension disabled, not arming observer');
       sendStatusMessage('EXTENSION_DISABLED');
