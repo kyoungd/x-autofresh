@@ -34,8 +34,14 @@
   // Random number generator helper
   const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
+  // Configuration flag to enable/disable time restrictions (for testing)
+  const ENABLE_TIME_RESTRICTIONS = true; // Set to false for testing
+
   // Time-based activation helper
   const isWithinActiveHours = () => {
+    if (!ENABLE_TIME_RESTRICTIONS) {
+      return true; // Always active when restrictions are disabled
+    }
     const now = new Date();
     
     // Convert to Pacific Time (handles PST/PDT automatically)
@@ -83,25 +89,77 @@
     }
   };
 
-  // Keep-alive micro scroll (1 pixel every 3-5 minutes)
-  const keepAliveScroll = () => {
+  // Natural scrolling animation helper
+  const naturalScroll = (targetY, duration = 2000) => {
+    return new Promise((resolve) => {
+      const startY = window.pageYOffset;
+      const distance = targetY - startY;
+      const startTime = Date.now();
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Add slight randomness to make movement more natural
+        const randomOffset = (Math.random() - 0.5) * 2; // ±1px random jitter
+        const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease-out cubic
+        const currentY = startY + (distance * easeProgress) + randomOffset;
+        
+        window.scrollTo(0, Math.max(0, currentY));
+        
+        if (progress < 1) {
+          // Add slight delay between frames (16-33ms) for more natural movement
+          setTimeout(animate, Math.random() * 17 + 16);
+        } else {
+          resolve();
+        }
+      };
+      
+      animate();
+    });
+  };
+
+  // Keep-alive micro scroll (100-200px down, wait, then back to top every 3-7 minutes)
+  const keepAliveScroll = async () => {
     const currentY = window.pageYOffset;
-    const direction = 1; // Always down
-    const newY = currentY + direction;
     
-    window.scrollTo(0, newY);
-    console.log(`[X Auto Scroll] Keep-alive micro scroll: down 1px`);
+    // Random scroll distance between 100-200px
+    const scrollDistance = Math.floor(Math.random() * 101) + 100; // 100-200px
+    const targetY = currentY + scrollDistance;
+    
+    console.log(`[X Auto Scroll] Keep-alive micro scroll: scrolling down ${scrollDistance}px`);
+    
+    // Scroll down naturally
+    await naturalScroll(targetY, Math.random() * 1000 + 1500); // 1.5-2.5 seconds
     
     sendStatusMessage('KEEP_ALIVE_SCROLL', { 
       direction: 'down',
-      position: newY
+      distance: scrollDistance,
+      position: window.pageYOffset
     });
+    
+    // Wait random time between 1-15 seconds
+    const waitTime = Math.random() * 14000 + 1000; // 1-15 seconds in ms
+    console.log(`[X Auto Scroll] Waiting ${Math.round(waitTime / 1000)}s before scrolling back up`);
+    
+    setTimeout(async () => {
+      console.log(`[X Auto Scroll] Keep-alive micro scroll: scrolling back to top`);
+      
+      // Scroll back to top naturally
+      await naturalScroll(0, Math.random() * 1500 + 2000); // 2-3.5 seconds
+      
+      sendStatusMessage('KEEP_ALIVE_SCROLL', { 
+        direction: 'up',
+        distance: 0,
+        position: window.pageYOffset
+      });
+    }, waitTime);
   };
 
   // Start random keep-alive scrolling (only during active hours)
   const startKeepAlive = () => {
     const scheduleNextKeepAlive = () => {
-      const nextInterval = randomBetween(3 * 60 * 1000, 5 * 60 * 1000); // 3-5 minutes in ms
+      const nextInterval = randomBetween(3 * 60 * 1000, 7 * 60 * 1000); // 3-7 minutes in ms
       console.log(`[X Auto Scroll] Next keep-alive scroll in ${Math.round(nextInterval / 60000)} minutes`);
       
       keepAliveInterval = setTimeout(() => {
