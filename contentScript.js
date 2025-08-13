@@ -119,12 +119,12 @@
     });
   };
 
-  // Keep-alive micro scroll (100-200px down, wait, then back to top every 3-7 minutes)
+  // Keep-alive micro scroll (300-1200px down, wait, then back to top every 3-7 minutes)
   const keepAliveScroll = async () => {
     const currentY = window.pageYOffset;
     
-    // Random scroll distance between 100-200px
-    const scrollDistance = Math.floor(Math.random() * 101) + 100; // 100-200px
+    // Random scroll distance between 300-1200px
+    const scrollDistance = Math.floor(Math.random() * 901) + 300; // 300-1200px
     const targetY = currentY + scrollDistance;
     
     console.log(`[X Auto Scroll] Keep-alive micro scroll: scrolling down ${scrollDistance}px`);
