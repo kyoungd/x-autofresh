@@ -86,14 +86,14 @@
   // Keep-alive micro scroll (1 pixel every 3-5 minutes)
   const keepAliveScroll = () => {
     const currentY = window.pageYOffset;
-    const direction = Math.random() > 0.5 ? 1 : -1; // Random direction
-    const newY = Math.max(0, currentY + direction);
+    const direction = 1; // Always down
+    const newY = currentY + direction;
     
     window.scrollTo(0, newY);
-    console.log(`[X Auto Scroll] Keep-alive micro scroll: ${direction > 0 ? 'down' : 'up'} 1px`);
+    console.log(`[X Auto Scroll] Keep-alive micro scroll: down 1px`);
     
     sendStatusMessage('KEEP_ALIVE_SCROLL', { 
-      direction: direction > 0 ? 'down' : 'up',
+      direction: 'down',
       position: newY
     });
   };
