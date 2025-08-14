@@ -89,6 +89,39 @@
     }
   };
 
+  // Natural mouse movement simulation
+  const simulateMouseMovement = (duration = 12500) => {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      const totalMoves = Math.floor(duration / 100); // Move every 100ms
+      let moveCount = 0;
+      
+      const moveInterval = setInterval(() => {
+        // Random position within viewport
+        const x = Math.random() * window.innerWidth;
+        const y = Math.random() * window.innerHeight;
+        
+        // Create and dispatch synthetic mouse events
+        const mouseMoveEvent = new MouseEvent('mousemove', {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y
+        });
+        
+        document.dispatchEvent(mouseMoveEvent);
+        
+        moveCount++;
+        if (moveCount >= totalMoves || Date.now() - startTime >= duration) {
+          clearInterval(moveInterval);
+          console.log(`[X Auto Scroll] Mouse movement simulation completed (${moveCount} moves)`);
+          resolve();
+        }
+      }, Math.random() * 50 + 75); // 75-125ms between moves
+    });
+  };
+
   // Natural scrolling animation helper
   const naturalScroll = (targetY, duration = 2000) => {
     return new Promise((resolve) => {
@@ -122,6 +155,13 @@
   // Keep-alive micro scroll (300-1200px down, wait, then back to top every 3-7 minutes)
   const keepAliveScroll = async () => {
     const currentY = window.pageYOffset;
+    
+    // Random mouse movement duration between 10-15 seconds
+    const mouseDuration = Math.random() * 5000 + 10000; // 10-15 seconds in ms
+    console.log(`[X Auto Scroll] Starting ${Math.round(mouseDuration / 1000)}s of mouse movement before scrolling`);
+    
+    // Simulate mouse movement for 10-15 seconds
+    await simulateMouseMovement(mouseDuration);
     
     // Random scroll distance between 300-1200px
     const scrollDistance = Math.floor(Math.random() * 901) + 300; // 300-1200px
