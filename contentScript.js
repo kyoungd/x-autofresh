@@ -122,33 +122,63 @@
     });
   };
 
-  // Natural scrolling animation helper
-  const naturalScroll = (targetY, duration = 2000) => {
+  // Mouse wheel scrolling simulation
+  const mouseWheelScroll = (targetY, isScrollingUp = false) => {
     return new Promise((resolve) => {
       const startY = window.pageYOffset;
       const distance = targetY - startY;
-      const startTime = Date.now();
+      const wheelSteps = Math.abs(Math.floor(distance / 120)); // ~120px per wheel step
+      let currentStep = 0;
       
-      const animate = () => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Add slight randomness to make movement more natural
-        const randomOffset = (Math.random() - 0.5) * 2; // ±1px random jitter
-        const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease-out cubic
-        const currentY = startY + (distance * easeProgress) + randomOffset;
-        
-        window.scrollTo(0, Math.max(0, currentY));
-        
-        if (progress < 1) {
-          // Add slight delay between frames (16-33ms) for more natural movement
-          setTimeout(animate, Math.random() * 17 + 16);
-        } else {
+      const scrollStep = () => {
+        if (currentStep >= wheelSteps) {
+          // Final adjustment to exact target
+          if (!isScrollingUp || targetY >= 0) {
+            window.scrollTo(0, targetY);
+          } else {
+            // For upward scrolling beyond 0, let it try to go negative (browser will clamp to 0)
+            window.scrollTo(0, targetY);
+            // Then add a small bounce back
+            setTimeout(() => {
+              window.scrollTo(0, Math.abs(targetY * 0.1)); // Small bounce
+              setTimeout(() => window.scrollTo(0, 0), 100); // Settle at 0
+            }, 50);
+          }
           resolve();
+          return;
         }
+        
+        // Simulate wheel events with random variations
+        const stepSize = Math.floor(distance / wheelSteps);
+        const randomVariation = (Math.random() - 0.5) * 40; // ±20px variation
+        const newY = startY + (stepSize * currentStep) + randomVariation;
+        
+        // Create and dispatch wheel event
+        const wheelEvent = new WheelEvent('wheel', {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          deltaY: distance > 0 ? 120 : -120, // Positive for down, negative for up
+          deltaMode: WheelEvent.DOM_DELTA_PIXEL
+        });
+        
+        document.dispatchEvent(wheelEvent);
+        
+        // Actually scroll
+        if (!isScrollingUp || newY >= 0) {
+          window.scrollTo(0, Math.max(0, newY));
+        } else {
+          // Allow negative attempt for bounce effect
+          window.scrollTo(0, newY);
+        }
+        
+        currentStep++;
+        
+        // Random delay between wheel steps (50-150ms)
+        setTimeout(scrollStep, Math.random() * 100 + 50);
       };
       
-      animate();
+      scrollStep();
     });
   };
 
@@ -169,8 +199,8 @@
     
     console.log(`[X Auto Scroll] Keep-alive micro scroll: scrolling down ${scrollDistance}px`);
     
-    // Scroll down naturally
-    await naturalScroll(targetY, Math.random() * 1000 + 1500); // 1.5-2.5 seconds
+    // Scroll down with mouse wheel simulation
+    await mouseWheelScroll(targetY, false);
     
     sendStatusMessage('KEEP_ALIVE_SCROLL', { 
       direction: 'down',
@@ -183,15 +213,17 @@
     console.log(`[X Auto Scroll] Waiting ${Math.round(waitTime / 1000)}s before scrolling back up`);
     
     setTimeout(async () => {
-      console.log(`[X Auto Scroll] Keep-alive micro scroll: scrolling back to top`);
+      console.log(`[X Auto Scroll] Keep-alive micro scroll: scrolling back to top (with overshoot)`);
       
-      // Scroll back to top naturally
-      await naturalScroll(0, Math.random() * 1500 + 2000); // 2-3.5 seconds
+      // Scroll back to top with overshoot (go beyond 0)
+      const overshoot = Math.random() * 200 + 100; // 100-300px overshoot
+      await mouseWheelScroll(-overshoot, true);
       
       sendStatusMessage('KEEP_ALIVE_SCROLL', { 
         direction: 'up',
         distance: 0,
-        position: window.pageYOffset
+        position: window.pageYOffset,
+        overshoot: overshoot
       });
     }, waitTime);
   };
