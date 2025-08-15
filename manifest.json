@@ -3,7 +3,7 @@
   "name": "X Auto Scroll",
   "version": "2.3",
   "description": "Automatically reveals new tweets on X/Twitter with zero page reloads.",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "activeTab"],
   "background": {
     "service_worker": "background.js"
   },

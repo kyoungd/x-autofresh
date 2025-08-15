@@ -281,60 +281,369 @@
     }
   };
 
-  // play alert sound from file
-  const playAlert = () => {
+  // Track user interaction and audio context state
+  let hasAudioPermission = false;
+  let audioContext = null;
+  let pendingAlert = false;
+
+  // Request audio permission immediately on load
+  const requestAudioPermission = () => {
+    console.log('[X Auto Scroll] 🔊 Requesting audio permission for alert system...');
+    
+    // Create AudioContext
     try {
-      const audio = new Audio(chrome.runtime.getURL('alert.mp3'));
-      audio.volume = 0.7;
-      audio.play()
-        .then(() => {
-          sendStatusMessage('ALERT_PLAYED', { success: true });
-        })
-        .catch(e => {
-          console.log('[X Auto Scroll] Alert audio failed:', e);
-          sendStatusMessage('ALERT_PLAYED', { success: false, error: e.message });
-        });
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      console.log('[X Auto Scroll] Audio context created, state:', audioContext.state);
     } catch (e) {
-      console.log('[X Auto Scroll] Alert audio creation failed:', e);
-      sendStatusMessage('ALERT_PLAYED', { success: false, error: e.message });
+      console.log('[X Auto Scroll] Audio context creation failed:', e);
+      return;
+    }
+    
+    // Show permission request message
+    const permissionDiv = document.createElement('div');
+    permissionDiv.id = 'x-autoscroll-audio-permission';
+    permissionDiv.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      z-index: 10000; background: #1da1f2; color: white; padding: 20px;
+      border-radius: 12px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+      font-size: 16px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      max-width: 400px; line-height: 1.4;
+    `;
+    
+    permissionDiv.innerHTML = `
+      <div style="margin-bottom: 15px; font-weight: bold;">🔊 X Auto Scroll Alert System</div>
+      <div style="margin-bottom: 20px;">This extension needs audio permission to play alert sounds when Pokemon Center queues are detected.</div>
+      <button id="enable-audio-btn" style="
+        background: white; color: #1da1f2; border: none; padding: 10px 20px;
+        border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px;
+        margin-right: 10px;
+      ">Enable Audio Alerts</button>
+      <button id="skip-audio-btn" style="
+        background: transparent; color: white; border: 1px solid white; padding: 10px 20px;
+        border-radius: 6px; cursor: pointer; font-size: 14px;
+      ">Skip (No Audio)</button>
+    `;
+    
+    document.body.appendChild(permissionDiv);
+    
+    // Handle enable button
+    document.getElementById('enable-audio-btn').onclick = async () => {
+      try {
+        console.log('[X Auto Scroll] User clicked "Enable Audio" - testing permission...');
+        
+        // Resume audio context
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+        
+        // Test with a short beep
+        const testAudio = new Audio(chrome.runtime.getURL('alert.mp3'));
+        testAudio.volume = 0.3;
+        await testAudio.play();
+        
+        // Success!
+        hasAudioPermission = true;
+        chrome.storage.sync.set({ audioPermission: true });
+        
+        console.log('[X Auto Scroll] ✅ Audio permission granted successfully!');
+        
+        // Update UI
+        permissionDiv.innerHTML = `
+          <div style="color: #4CAF50; font-weight: bold; font-size: 18px;">✅ Audio Enabled!</div>
+          <div style="margin-top: 10px;">Alert sounds will now play when queues are detected.</div>
+        `;
+        
+        setTimeout(() => {
+          permissionDiv.remove();
+        }, 2000);
+        
+        sendStatusMessage('AUDIO_PERMISSION_GRANTED', { success: true });
+        
+      } catch (e) {
+        console.log('[X Auto Scroll] Audio permission failed:', e);
+        permissionDiv.innerHTML = `
+          <div style="color: #ff6b6b; font-weight: bold;">❌ Audio Permission Failed</div>
+          <div style="margin-top: 10px; font-size: 14px;">Please check browser settings and reload the page to try again.</div>
+        `;
+        
+        setTimeout(() => {
+          permissionDiv.remove();
+        }, 3000);
+      }
+    };
+    
+    // Handle skip button  
+    document.getElementById('skip-audio-btn').onclick = () => {
+      console.log('[X Auto Scroll] User skipped audio permission');
+      permissionDiv.remove();
+      sendStatusMessage('AUDIO_PERMISSION_SKIPPED', { skipped: true });
+    };
+  };
+
+  // Setup detection for any user interaction to unlock audio
+  const setupUserInteractionDetection = () => {
+    console.log('[X Auto Scroll] Setting up user interaction detection for audio unlock...');
+    
+    const unlockAudio = async (event) => {
+      if (hasAudioPermission) return; // Already unlocked
+      
+      console.log('[X Auto Scroll] User interaction detected:', event.type, 'unlocking audio...');
+      
+      try {
+        // Method 1: Resume audio context
+        if (audioContext && audioContext.state === 'suspended') {
+          await audioContext.resume();
+          console.log('[X Auto Scroll] Audio context resumed to state:', audioContext.state);
+        } else if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          console.log('[X Auto Scroll] New audio context created, state:', audioContext.state);
+        }
+        
+        // Method 2: Test with low volume beep first (less intrusive)
+        try {
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+          gainNode.gain.setValueAtTime(0.01, audioContext.currentTime); // Very low volume
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.1); // Short beep
+          
+          console.log('[X Auto Scroll] ✅ Audio unlocked successfully with Web Audio!');
+          hasAudioPermission = true;
+          chrome.storage.sync.set({ audioPermission: true });
+          
+          // Remove event listeners - we're done
+          ['click', 'keydown', 'touchstart', 'scroll', 'mousemove'].forEach(eventType => {
+            document.removeEventListener(eventType, unlockAudio);
+          });
+          
+          // Play any pending alert
+          if (pendingAlert) {
+            console.log('[X Auto Scroll] Playing pending alert...');
+            pendingAlert = false;
+            setTimeout(playAlert, 200);
+          }
+          
+        } catch (webAudioError) {
+          console.log('[X Auto Scroll] Web Audio test failed:', webAudioError);
+          
+          // Fallback: Test with HTML5 Audio
+          const testAudio = new Audio(chrome.runtime.getURL('alert.mp3'));
+          testAudio.volume = 0.1;
+          await testAudio.play();
+          
+          console.log('[X Auto Scroll] ✅ Audio unlocked successfully with HTML5 Audio!');
+          hasAudioPermission = true;
+          chrome.storage.sync.set({ audioPermission: true });
+          
+          // Remove event listeners - we're done
+          ['click', 'keydown', 'touchstart', 'scroll', 'mousemove'].forEach(eventType => {
+            document.removeEventListener(eventType, unlockAudio);
+          });
+          
+          // Play any pending alert
+          if (pendingAlert) {
+            console.log('[X Auto Scroll] Playing pending alert...');
+            pendingAlert = false;
+            setTimeout(playAlert, 200);
+          }
+        }
+        
+      } catch (e) {
+        console.log('[X Auto Scroll] Audio unlock failed:', e);
+      }
+    };
+    
+    // Listen for any user interaction
+    ['click', 'keydown', 'touchstart', 'scroll', 'mousemove'].forEach(eventType => {
+      document.addEventListener(eventType, unlockAudio, { once: true, passive: true });
+    });
+  };
+
+  // Check stored audio permission on load
+  const checkAudioPermission = async () => {
+    try {
+      const result = await chrome.storage.sync.get({ audioPermission: false });
+      hasAudioPermission = result.audioPermission;
+      console.log('[X Auto Scroll] Stored audio permission status:', hasAudioPermission);
+      
+      if (hasAudioPermission) {
+        // Re-initialize audio context for this session
+        try {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          if (audioContext.state === 'suspended') {
+            audioContext.resume();
+          }
+          console.log('[X Auto Scroll] Audio context re-initialized from stored permission');
+        } catch (e) {
+          console.log('[X Auto Scroll] Audio context re-initialization failed:', e);
+          hasAudioPermission = false;
+          requestAudioPermission();
+        }
+      } else {
+        // Request audio permission with user-friendly prompt
+        requestAudioPermission();
+      }
+    } catch (e) {
+      console.log('[X Auto Scroll] Failed to check audio permission:', e);
+      requestAudioPermission();
     }
   };
 
-  // play beep sound - try multiple methods
-  const playBeep = () => {
-    // Method 1: Web Audio API
+  // Initialize audio context when permission is granted
+  const initAudioContext = () => {
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+      console.log('[X Auto Scroll] Audio context initialized successfully');
       
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
+      // If there was a pending alert, play it now
+      if (pendingAlert) {
+        pendingAlert = false;
+        setTimeout(playAlert, 100);
+      }
+    } catch (e) {
+      console.log('[X Auto Scroll] Audio context creation failed:', e);
+    }
+  };
+
+  // Listen for audio permission messages from popup
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'AUDIO_PERMISSION_GRANTED') {
+      console.log('[X Auto Scroll] Audio permission granted via popup');
+      hasAudioPermission = true;
+      initAudioContext();
       
-      oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+      // If there was a pending alert, play it now
+      if (pendingAlert) {
+        console.log('[X Auto Scroll] Playing pending alert now that permission is granted');
+        pendingAlert = false;
+        setTimeout(playAlert, 500);
+      }
       
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.2);
+      sendResponse({ success: true });
+    }
+  });
+
+  // Check permission on load
+  checkAudioPermission();
+
+  // play alert sound from file
+  const playAlert = () => {
+    console.log('[X Auto Scroll] Attempting to play alert...');
+    
+    // Try to play audio regardless of permission state (aggressive approach)
+    try {
+      const audio = new Audio(chrome.runtime.getURL('alert.mp3'));
+      audio.volume = 0.7;
+      
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('[X Auto Scroll] ✅ Alert played successfully');
+            hasAudioPermission = true; // Mark as working
+            chrome.storage.sync.set({ audioPermission: true });
+            sendStatusMessage('ALERT_PLAYED', { success: true });
+          })
+          .catch(e => {
+            console.log('[X Auto Scroll] Alert audio failed, checking permission and trying fallback:', e);
+            
+            if (!hasAudioPermission) {
+              console.log('[X Auto Scroll] Queuing alert - no audio permission yet');
+              pendingAlert = true;
+              sendStatusMessage('ALERT_QUEUED', { 
+                reason: 'Browser audio policy blocking - waiting for user interaction',
+                instructions: 'Audio will play automatically after any page interaction (click, scroll, keypress)'
+              });
+            } else {
+              // Try fallback beep
+              playBeep();
+              sendStatusMessage('ALERT_PLAYED', { 
+                success: false, 
+                error: e.message,
+                fallback: 'beep'
+              });
+            }
+          });
+      }
+    } catch (e) {
+      console.log('[X Auto Scroll] Alert audio creation failed:', e);
+      
+      if (!hasAudioPermission) {
+        console.log('[X Auto Scroll] Queuing alert - no audio permission yet');
+        pendingAlert = true;
+        sendStatusMessage('ALERT_QUEUED', { 
+          reason: 'Audio context not ready',
+          instructions: 'Audio will play automatically after any page interaction'
+        });
+      } else {
+        playBeep(); // Fallback to beep
+        sendStatusMessage('ALERT_PLAYED', { 
+          success: false, 
+          error: e.message,
+          fallback: 'beep'
+        });
+      }
+    }
+  };
+
+  // play beep sound - try multiple methods aggressively
+  const playBeep = () => {
+    console.log('[X Auto Scroll] 🔊 Playing beep (aggressive mode)');
+
+    // Method 1: Use initialized Web Audio API context (try regardless of permission state)
+    try {
+      const context = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Resume context if suspended
+      if (context.state === 'suspended') {
+        context.resume().then(() => {
+          createBeep(context);
+        }).catch(e => console.log('[X Auto Scroll] Audio context resume failed:', e));
+      } else {
+        createBeep(context);
+      }
+      
+      function createBeep(ctx) {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        oscillator.frequency.setValueAtTime(800, ctx.currentTime);
+        gainNode.gain.setValueAtTime(0.1, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+        
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.2);
+      }
     } catch (e) {
       console.log('[X Auto Scroll] Web Audio API failed:', e);
     }
 
-    // Method 2: HTML5 Audio with data URI
+    // Method 2: HTML5 Audio with data URI (try regardless of permission state)
     try {
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ');
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ2PLCeSgGKYDI8N2QQAoUXrTp66hVFApGn+H1unMfCkCZ');
       audio.volume = 0.1;
       audio.play().catch(e => console.log('[X Auto Scroll] HTML5 Audio failed:', e));
     } catch (e) {
       console.log('[X Auto Scroll] HTML5 Audio creation failed:', e);
     }
 
-    // Method 3: System beep fallback
-    try {
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance('\u0007'));
-    } catch (e) {
-      console.log('[X Auto Scroll] Speech synthesis beep failed:', e);
+    // If we don't have permission yet, queue this beep for when we get it
+    if (!hasAudioPermission) {
+      console.log('[X Auto Scroll] ⏳ No audio permission yet, but attempting beep anyway');
+      // Store that we attempted a beep for potential retry
+      chrome.storage.sync.set({ pendingBeep: true });
     }
   };
 
@@ -451,12 +760,21 @@
       .sort((a, b) => a.translateY - b.translateY)
       .slice(0, 3); // Only check first 3 panels (lowest translateY values)
 
-    // Check for "pokemon center queue" in the first 3 panels only
+    // Check for "pokemon center queue" or "Costco queue" in the first 4 panels only
     for (const panel of panels) {
       const panelText = panel.element.textContent || panel.element.innerText || '';
       if (panelText.toLowerCase().includes('pokemon center queue')) {
         console.log(`[X Auto Scroll] Found "pokemon center queue" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('POKEMON_QUEUE_DETECTED', { 
+          timestamp: new Date().toISOString(),
+          panelPosition: panel.translateY 
+        });
+        playAlert();
+        return true;
+      }
+      if (panelText.toLowerCase().includes('queue live at costco')) {
+        console.log(`[X Auto Scroll] Found "queue live at costco" in panel at translateY(${panel.translateY}px) - playing alert`);
+        sendStatusMessage('COSTCO_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
           panelPosition: panel.translateY 
         });

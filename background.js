@@ -18,12 +18,65 @@ chrome.runtime.onInstalled.addListener((details) => {
   chrome.storage.sync.set({ isEnabled: true }, () => {
     log('Default settings initialized');
   });
+
+  // Check if audio permission is needed and auto-open popup
+  checkAndRequestAudioPermission();
 });
 
 // Handle startup
 chrome.runtime.onStartup.addListener(() => {
   log('Browser started, service worker active');
+  
+  // Check audio permission on startup too
+  setTimeout(checkAndRequestAudioPermission, 2000);
 });
+
+// Check audio permission and auto-open popup if needed
+const checkAndRequestAudioPermission = async () => {
+  try {
+    const { audioPermission } = await chrome.storage.sync.get({ audioPermission: false });
+    
+    if (!audioPermission) {
+      log('🔊 No audio permission detected - checking for Twitter/X tabs...');
+      
+      // Check if user has Twitter/X tabs open
+      chrome.tabs.query({}, (tabs) => {
+        const twitterTabs = tabs.filter(tab => 
+          tab.url?.includes('twitter.com') || tab.url?.includes('x.com')
+        );
+        
+        if (twitterTabs.length > 0) {
+          log(`📍 Found ${twitterTabs.length} Twitter/X tab(s) - opening popup for audio permission`);
+          
+          // Focus the first Twitter/X tab and open popup
+          chrome.tabs.update(twitterTabs[0].id, { active: true }, () => {
+            // Small delay to ensure tab is focused
+            setTimeout(() => {
+              chrome.action.openPopup().then(() => {
+                log('✅ Popup opened automatically for audio permission');
+              }).catch(e => {
+                log('❌ Failed to auto-open popup (user interaction required):', e.message);
+                // Set a badge to draw attention
+                chrome.action.setBadgeText({ text: '!' });
+                chrome.action.setBadgeBackgroundColor({ color: '#ff4444' });
+                chrome.action.setTitle({ title: 'Click to enable Pokemon queue audio alerts' });
+              });
+            }, 500);
+          });
+        } else {
+          log('⚪ No Twitter/X tabs found - will check audio permission when user visits Twitter/X');
+        }
+      });
+    } else {
+      log('✅ Audio permission already granted');
+      // Clear any badge
+      chrome.action.setBadgeText({ text: '' });
+      chrome.action.setTitle({ title: 'X Auto Scroll - Pokemon Queue Monitor' });
+    }
+  } catch (e) {
+    log('Error checking audio permission:', e);
+  }
+};
 
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -48,6 +101,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       log(`Tab ${tabId} status: ${message.data.status}`, message.data.details);
       break;
 
+    case 'AUDIO_PERMISSION_GRANTED_CLEAR_BADGE':
+      log('🔊 Audio permission granted - clearing notification badge');
+      chrome.action.setBadgeText({ text: '' });
+      chrome.action.setTitle({ title: 'X Auto Scroll - Pokemon Queue Monitor' });
+      break;
+
     case 'SHOW_POSTS_CLICKED':
       if (message.data.success) {
         log(`✅ FOUND & CLICKED: "${message.data.text}" on tab ${tabId}`, { 
@@ -69,10 +128,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       break;
 
+    case 'COSTCO_QUEUE_DETECTED':
+      log(`🚨 COSTCO QUEUE detected on tab ${tabId}!`, { 
+        url: url?.substring(0, 50) + '...',
+        timestamp: new Date().toISOString()
+      });
+      break;
+
     case 'ALERT_PLAYED':
       log(`🔊 Alert played on tab ${tabId}`, { 
         success: message.data.success,
         error: message.data.error
+      });
+      break;
+
+    case 'ALERT_QUEUED':
+      log(`⏳ Alert queued on tab ${tabId} - ${message.data.reason}`, { 
+        reason: message.data.reason,
+        instructions: message.data.instructions
       });
       break;
 
@@ -127,9 +200,39 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (tab.url?.includes('twitter.com') || tab.url?.includes('x.com')) {
       log(`✅ FOUND Twitter/X tab: ${tabId}`, { url: tab.url?.substring(0, 50) + '...' });
       log(`Extension will activate on this tab automatically`);
+      
+      // Check if we need audio permission for this new Twitter/X tab
+      checkAudioPermissionForNewTab(tabId);
     }
   }
 });
+
+// Check audio permission when user opens a new Twitter/X tab
+const checkAudioPermissionForNewTab = async (tabId) => {
+  try {
+    const { audioPermission } = await chrome.storage.sync.get({ audioPermission: false });
+    
+    if (!audioPermission) {
+      log(`🔊 New Twitter/X tab ${tabId} opened without audio permission - setting notification badge`);
+      
+      // Set attention-grabbing badge
+      chrome.action.setBadgeText({ text: '🔊' });
+      chrome.action.setBadgeBackgroundColor({ color: '#ff4444' });
+      chrome.action.setTitle({ title: 'IMPORTANT: Click to enable Pokemon queue audio alerts!' });
+      
+      // Try to auto-open popup (may fail due to user interaction requirements)
+      setTimeout(() => {
+        chrome.action.openPopup().then(() => {
+          log('✅ Popup auto-opened for new Twitter/X tab');
+        }).catch(e => {
+          log('⚠️ Cannot auto-open popup - user must click extension icon for audio permission');
+        });
+      }, 1000);
+    }
+  } catch (e) {
+    log('Error checking audio permission for new tab:', e);
+  }
+};
 
 // Monitor tab removal
 chrome.tabs.onRemoved.addListener((tabId) => {
