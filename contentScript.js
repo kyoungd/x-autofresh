@@ -35,7 +35,7 @@
   const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
   // Configuration flag to enable/disable time restrictions (for testing)
-  const ENABLE_TIME_RESTRICTIONS = true; // Set to false for testing
+  const ENABLE_TIME_RESTRICTIONS = false; // Set to false for testing
 
   // Time-based activation helper
   const isWithinActiveHours = () => {
@@ -89,49 +89,69 @@
     }
   };
 
-  // Natural mouse movement simulation
-  const simulateMouseMovement = (duration = 12500) => {
+  // Natural mouse movement simulation with bursts and pauses
+  const simulateMouseMovement = (totalDuration = 12500) => {
     return new Promise((resolve) => {
       const startTime = Date.now();
-      const totalMoves = Math.floor(duration / 100); // Move every 100ms
-      let moveCount = 0;
+      let elapsed = 0;
       
-      const moveInterval = setInterval(() => {
-        // Random position within viewport
-        const x = Math.random() * window.innerWidth;
-        const y = Math.random() * window.innerHeight;
-        
-        // Create and dispatch synthetic mouse events
-        const mouseMoveEvent = new MouseEvent('mousemove', {
-          view: window,
-          bubbles: true,
-          cancelable: true,
-          clientX: x,
-          clientY: y
-        });
-        
-        document.dispatchEvent(mouseMoveEvent);
-        
-        moveCount++;
-        if (moveCount >= totalMoves || Date.now() - startTime >= duration) {
-          clearInterval(moveInterval);
-          console.log(`[X Auto Scroll] Mouse movement simulation completed (${moveCount} moves)`);
+      const doBurst = () => {
+        if (elapsed >= totalDuration) {
+          console.log(`[X Auto Scroll] Mouse movement simulation completed`);
           resolve();
+          return;
         }
-      }, Math.random() * 50 + 75); // 75-125ms between moves
+        
+        // Random burst of 3-8 quick movements
+        const burstSize = Math.floor(Math.random() * 6) + 3;
+        let burstCount = 0;
+        
+        const burstInterval = setInterval(() => {
+          // Random position within viewport
+          const x = Math.random() * window.innerWidth;
+          const y = Math.random() * window.innerHeight;
+          
+          // Create and dispatch synthetic mouse events
+          const mouseMoveEvent = new MouseEvent('mousemove', {
+            view: window,
+            bubbles: true,
+            cancelable: true,
+            clientX: x,
+            clientY: y
+          });
+          
+          document.dispatchEvent(mouseMoveEvent);
+          
+          burstCount++;
+          if (burstCount >= burstSize) {
+            clearInterval(burstInterval);
+            
+            // Pause between bursts (200-800ms)
+            const pauseDuration = Math.random() * 600 + 200;
+            elapsed += (burstSize * 50) + pauseDuration; // Approximate time
+            
+            setTimeout(doBurst, pauseDuration);
+          }
+        }, 30 + Math.random() * 40); // 30-70ms between moves in burst
+      };
+      
+      doBurst();
     });
   };
 
-  // Mouse wheel scrolling simulation
+  // Mouse wheel scrolling simulation with realistic chunks and pauses
   const mouseWheelScroll = (targetY, isScrollingUp = false) => {
     return new Promise((resolve) => {
       const startY = window.pageYOffset;
-      const distance = targetY - startY;
-      const wheelSteps = Math.abs(Math.floor(distance / 120)); // ~120px per wheel step
-      let currentStep = 0;
+      const totalDistance = Math.abs(targetY - startY);
+      let currentY = startY;
       
-      const scrollStep = () => {
-        if (currentStep >= wheelSteps) {
+      const doScrollChunk = () => {
+        const remainingDistance = isScrollingUp ? 
+          Math.abs(currentY - targetY) : 
+          Math.abs(targetY - currentY);
+        
+        if (remainingDistance <= 10) {
           // Final adjustment to exact target
           if (!isScrollingUp || targetY >= 0) {
             window.scrollTo(0, targetY);
@@ -148,17 +168,20 @@
           return;
         }
         
-        // Simulate wheel events with random variations
-        const stepSize = Math.floor(distance / wheelSteps);
-        const randomVariation = (Math.random() - 0.5) * 40; // ±20px variation
-        const newY = startY + (stepSize * currentStep) + randomVariation;
+        // Random chunk size around 200px (150-250px)
+        const baseChunkSize = Math.random() * 100 + 150; // 150-250px
+        const chunkSize = Math.min(baseChunkSize, remainingDistance);
+        
+        // Direction
+        const scrollDirection = isScrollingUp ? -1 : 1;
+        const newY = currentY + (chunkSize * scrollDirection);
         
         // Create and dispatch wheel event
         const wheelEvent = new WheelEvent('wheel', {
           view: window,
           bubbles: true,
           cancelable: true,
-          deltaY: distance > 0 ? 120 : -120, // Positive for down, negative for up
+          deltaY: scrollDirection * 120, // Positive for down, negative for up
           deltaMode: WheelEvent.DOM_DELTA_PIXEL
         });
         
@@ -167,22 +190,25 @@
         // Actually scroll
         if (!isScrollingUp || newY >= 0) {
           window.scrollTo(0, Math.max(0, newY));
+          currentY = Math.max(0, newY);
         } else {
           // Allow negative attempt for bounce effect
           window.scrollTo(0, newY);
+          currentY = newY;
         }
         
-        currentStep++;
+        console.log(`[X Auto Scroll] Scrolled ${chunkSize.toFixed(0)}px ${isScrollingUp ? 'up' : 'down'} (now at ${currentY}px)`);
         
-        // Random delay between wheel steps (50-150ms)
-        setTimeout(scrollStep, Math.random() * 100 + 50);
+        // Random pause between chunks (300-1200ms)
+        const pauseDuration = Math.random() * 900 + 300;
+        setTimeout(doScrollChunk, pauseDuration);
       };
       
-      scrollStep();
+      doScrollChunk();
     });
   };
 
-  // Keep-alive micro scroll (300-1200px down, wait, then back to top every 3-7 minutes)
+  // Keep-alive micro scroll (600-2400px down, wait, then back to top every 3-7 minutes)
   const keepAliveScroll = async () => {
     const currentY = window.pageYOffset;
     
@@ -193,8 +219,8 @@
     // Simulate mouse movement for 10-15 seconds
     await simulateMouseMovement(mouseDuration);
     
-    // Random scroll distance between 300-1200px
-    const scrollDistance = Math.floor(Math.random() * 901) + 300; // 300-1200px
+    // Random scroll distance between 600-2400px
+    const scrollDistance = Math.floor(Math.random() * 1801) + 600; // 600-2400px
     const targetY = currentY + scrollDistance;
     
     console.log(`[X Auto Scroll] Keep-alive micro scroll: scrolling down ${scrollDistance}px`);
