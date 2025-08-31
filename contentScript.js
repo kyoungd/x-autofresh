@@ -34,8 +34,9 @@
   // Random number generator helper
   const randomBetween = (min, max) => Math.random() * (max - min) + min;
 
-  // Configuration flag to enable/disable time restrictions (for testing)
+  // Configuration flags
   const ENABLE_TIME_RESTRICTIONS = false; // Set to false for testing
+  const DEBUG_PRINT = false; // Set to true for verbose logging
 
   // Time-based activation helper
   const isWithinActiveHours = () => {
@@ -52,8 +53,8 @@
     // 8:00 AM - 12:00 PM PST (8-12 hours)
     const morningSession = hours >= 8 && hours < 12;
     
-    // 1:00 PM - 3:30 PM PST (13:00-15:30)
-    const afternoonSession = hours === 13 || hours === 14 || (hours === 15 && minutes <= 30);
+    // 11:30 PM - 1:30 AM PST (11:30 PM-1:30 AM)
+    const afternoonSession = (hours === 23 && minutes >= 30) || hours === 0 || (hours === 1 && minutes <= 30);
     
     const isActive = morningSession || afternoonSession;
     
@@ -66,27 +67,7 @@
   };
 
   const getNextActiveTime = () => {
-    const now = new Date();
-    const pacificTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
-    const hours = pacificTime.getHours();
-    const minutes = pacificTime.getMinutes();
-    
-    // If before 8 AM, next active is 8 AM today
-    if (hours < 8) {
-      return "8:00 AM PT";
-    }
-    // If between 12 PM and 1 PM, next active is 1 PM today
-    else if (hours === 12 || (hours === 13 && minutes === 0)) {
-      return "1:00 PM PT";
-    }
-    // If after 3:30 PM, next active is 8 AM tomorrow
-    else if (hours > 15 || (hours === 15 && minutes > 30)) {
-      return "8:00 AM PT tomorrow";
-    }
-    // Otherwise we're currently active
-    else {
-      return "Active now";
-    }
+    return isWithinActiveHours() ? "Active Now" : "Not Active";
   };
 
   // Natural mouse movement simulation with bursts and pauses
@@ -649,11 +630,15 @@
 
   // click on "Show X posts" button
   const clickShowPosts = () => {
-    console.log('[X Auto Scroll] Searching for "Show X posts" button...');
+    if (DEBUG_PRINT) {
+      console.log('[X Auto Scroll] Searching for "Show X posts" button...');
+    }
     
     // Method 1: Look for spans with "Show X post" text
     const allSpans = document.querySelectorAll('span');
-    console.log(`[X Auto Scroll] Found ${allSpans.length} span elements to check`);
+    if (DEBUG_PRINT) {
+      console.log(`[X Auto Scroll] Found ${allSpans.length} span elements to check`);
+    }
     
     let foundMessage = null;
     
@@ -705,7 +690,9 @@
     
     // Method 2: Look specifically for buttons with data-testid="cellInnerDiv" parent
     const cellDivs = document.querySelectorAll('[data-testid="cellInnerDiv"]');
-    console.log(`[X Auto Scroll] Found ${cellDivs.length} cellInnerDiv elements to check`);
+    if (DEBUG_PRINT) {
+      console.log(`[X Auto Scroll] Found ${cellDivs.length} cellInnerDiv elements to check`);
+    }
     
     for (const cellDiv of cellDivs) {
       const spans = cellDiv.querySelectorAll('span');
@@ -737,7 +724,9 @@
       }
     }
     
-    console.log('[X Auto Scroll] ⚪ No "Show X posts" message found');
+    if (DEBUG_PRINT) {
+      console.log('[X Auto Scroll] ⚪ No "Show X posts" message found');
+    }
     return false;
   };
 
@@ -772,7 +761,16 @@
         playAlert();
         return true;
       }
-      if (panelText.toLowerCase().includes('queue live at costco')) {
+      if (panelText.toLowerCase().includes('queue live at costco') || panelText.toLowerCase().includes('is up at costco')) {
+        console.log(`[X Auto Scroll] Found "queue live at costco" in panel at translateY(${panel.translateY}px) - playing alert`);
+        sendStatusMessage('COSTCO_QUEUE_DETECTED', { 
+          timestamp: new Date().toISOString(),
+          panelPosition: panel.translateY 
+        });
+        playAlert();
+        return true;
+      }
+      if (panelText.toLowerCase().includes('is up at target')) {
         console.log(`[X Auto Scroll] Found "queue live at costco" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('COSTCO_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
@@ -931,7 +929,9 @@
       console.log('[X Auto Scroll] Running immediate test for "Show X posts" button');
       const found = clickShowPosts();
       if (!found) {
-        console.log('[X Auto Scroll] No "Show X posts" button found in immediate test');
+        if (DEBUG_PRINT) {
+          console.log('[X Auto Scroll] No "Show X posts" button found in immediate test');
+        }
       }
     }, 2000); // Wait 2 seconds for page to load
   };

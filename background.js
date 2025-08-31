@@ -1,6 +1,9 @@
 // Service Worker for X Auto Scroll Extension
 console.log('[X Auto Scroll Background] Service worker starting...');
 
+// Configuration flags
+const DEBUG_PRINT = false; // Set to true for verbose logging
+
 // Track active tabs and their status
 const tabStatus = new Map();
 
@@ -98,7 +101,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         details: message.data.details
       });
       
-      log(`Tab ${tabId} status: ${message.data.status}`, message.data.details);
+      if (DEBUG_PRINT) {
+        log(`Tab ${tabId} status: ${message.data.status}`, message.data.details);
+      }
       break;
 
     case 'AUDIO_PERMISSION_GRANTED_CLEAR_BADGE':
@@ -257,13 +262,17 @@ const scanForTwitterPages = () => {
     );
     
     if (twitterTabs.length > 0) {
-      log(`📍 SCAN RESULT: Found ${twitterTabs.length} Twitter/X page(s):`);
-      twitterTabs.forEach(tab => {
-        log(`  Tab ${tab.id}: ${tab.url?.substring(0, 60)}...`);
-      });
+      if (DEBUG_PRINT) {
+        log(`📍 SCAN RESULT: Found ${twitterTabs.length} Twitter/X page(s):`);
+        twitterTabs.forEach(tab => {
+          log(`  Tab ${tab.id}: ${tab.url?.substring(0, 60)}...`);
+        });
+      }
     } else {
-      log(`❌ SCAN RESULT: No Twitter/X pages found`);
-      log(`💡 Open x.com or twitter.com to start monitoring`);
+      if (DEBUG_PRINT) {
+        log(`❌ SCAN RESULT: No Twitter/X pages found`);
+        log(`💡 Open x.com or twitter.com to start monitoring`);
+      }
     }
   });
 };
@@ -271,7 +280,9 @@ const scanForTwitterPages = () => {
 // Keep service worker alive and log periodic status
 setInterval(() => {
   const activeTabsCount = tabStatus.size;
-  log(`Service worker heartbeat - tracking ${activeTabsCount} active tabs`);
+  if (DEBUG_PRINT) {
+    log(`Service worker heartbeat - tracking ${activeTabsCount} active tabs`);
+  }
   
   // Scan for Twitter/X pages every heartbeat
   scanForTwitterPages();
