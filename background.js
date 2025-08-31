@@ -140,6 +140,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       break;
 
+    case 'TARGET_QUEUE_DETECTED':
+      log(`🚨 TARGET QUEUE detected on tab ${tabId}!`, { 
+        url: url?.substring(0, 50) + '...',
+        timestamp: new Date().toISOString()
+      });
+      break;
+
     case 'ALERT_PLAYED':
       log(`🔊 Alert played on tab ${tabId}`, { 
         success: message.data.success,
