@@ -86,11 +86,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab?.id;
   const url = sender.tab?.url;
   
-  log(`Message received from tab ${tabId}`, { 
-    type: message.type, 
-    url: url?.substring(0, 50) + '...',
-    data: message.data 
-  });
+  if (DEBUG_PRINT) {
+    log(`Message received from tab ${tabId}`, { 
+      type: message.type, 
+      url: url?.substring(0, 50) + '...',
+      data: message.data 
+    });
+  }
 
   switch (message.type) {
     case 'STATUS_UPDATE':
@@ -184,11 +186,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const pokemonStatus = message.data.foundPokemon ? '🚨 Pokemon found!' : '';
         const showPostsStatus = message.data.clickedShowPosts ? '✅ Clicked "Show posts"' : '⚪ No "Show posts" found';
         
-        log(`🔍 10s Check on tab ${tabId}: ${showPostsStatus} ${pokemonStatus}`.trim(), {
-          foundPokemon: message.data.foundPokemon,
-          clickedShowPosts: message.data.clickedShowPosts,
-          timestamp: message.data.timestamp
-        });
+        if (DEBUG_PRINT) {
+          log(`🔍 10s Check on tab ${tabId}: ${showPostsStatus} ${pokemonStatus}`.trim(), {
+            foundPokemon: message.data.foundPokemon,
+            clickedShowPosts: message.data.clickedShowPosts,
+            timestamp: message.data.timestamp
+          });
+        }
       }
       break;
 
