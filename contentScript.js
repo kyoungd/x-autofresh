@@ -126,8 +126,30 @@
       const startY = window.pageYOffset;
       const totalDistance = Math.abs(targetY - startY);
       let currentY = startY;
+      let lastActualY = startY;
+      let stuckCount = 0;
       
       const doScrollChunk = () => {
+        // Check current actual scroll position
+        const actualY = window.pageYOffset;
+        
+        // Detect if we're stuck at scroll boundary
+        if (Math.abs(actualY - lastActualY) < 1 && stuckCount >= 2) {
+          // We've been stuck for 2+ iterations, assume we hit boundary
+          if (isScrollingUp && actualY === 0) {
+            console.log(`[X Auto Scroll] Hit top boundary, triggering bounce effect`);
+            // For upward scrolling beyond 0, let it try to go negative (browser will clamp to 0)
+            window.scrollTo(0, targetY);
+            // Then add a small bounce back
+            setTimeout(() => {
+              window.scrollTo(0, Math.abs(targetY * 0.1)); // Small bounce
+              setTimeout(() => window.scrollTo(0, 0), 100); // Settle at 0
+            }, 50);
+            resolve();
+            return;
+          }
+        }
+        
         // Use consistent distance calculation
         const remainingDistance = Math.abs(targetY - currentY);
         
@@ -167,11 +189,26 @@
         
         document.dispatchEvent(wheelEvent);
         
-        // Actually scroll - always update currentY to track intended position
+        // Actually scroll
         window.scrollTo(0, Math.max(0, newY));
-        currentY = newY; // Track intended position even if browser clamps to 0
         
-        console.log(`[X Auto Scroll] Scrolled ${chunkSize.toFixed(0)}px ${scrollDirection > 0 ? 'down' : 'up'} (intended: ${currentY}px, actual: ${window.pageYOffset}px)`);
+        // Track if we're making actual progress
+        const newActualY = window.pageYOffset;
+        if (Math.abs(newActualY - lastActualY) < 1) {
+          stuckCount++;
+        } else {
+          stuckCount = 0;
+        }
+        lastActualY = newActualY;
+        
+        // Update currentY - for upward scrolling to negative targets, stop at 0
+        if (isScrollingUp && targetY < 0 && newActualY === 0) {
+          currentY = 0; // Don't track beyond what browser can do
+        } else {
+          currentY = newY;
+        }
+        
+        console.log(`[X Auto Scroll] Scrolled ${chunkSize.toFixed(0)}px ${scrollDirection > 0 ? 'down' : 'up'} (intended: ${currentY}px, actual: ${newActualY}px)`);
         
         // Random pause between chunks (300-1200ms)
         const pauseDuration = Math.random() * 900 + 300;
