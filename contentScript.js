@@ -36,7 +36,7 @@
 
   // Configuration flags
   const ENABLE_TIME_RESTRICTIONS = false; // Set to false for testing
-  const DEBUG_PRINT = false; // Set to true for verbose logging
+  const DEBUG_PRINT = true; // Set to true for verbose logging
 
   // Time-based activation helper
   const isWithinActiveHours = () => {
@@ -391,9 +391,16 @@
           oscillator.start(audioContext.currentTime);
           oscillator.stop(audioContext.currentTime + 0.1); // Short beep
           
-          console.log('[X Auto Scroll] ✅ Audio unlocked successfully with Web Audio!');
+          console.log('[X Auto Scroll] ✅ Audio unlocked successfully with Web Audio API after user interaction!');
           hasAudioPermission = true;
           chrome.storage.sync.set({ audioPermission: true });
+          
+          // Send success message
+          sendStatusMessage('AUDIO_UNLOCKED', { 
+            method: 'Web Audio API',
+            interactionType: event.type,
+            success: true
+          });
           
           // Remove event listeners - we're done
           ['click', 'keydown', 'touchstart', 'scroll', 'mousemove'].forEach(eventType => {
@@ -415,9 +422,16 @@
           testAudio.volume = 0.1;
           await testAudio.play();
           
-          console.log('[X Auto Scroll] ✅ Audio unlocked successfully with HTML5 Audio!');
+          console.log('[X Auto Scroll] ✅ Audio unlocked successfully with HTML5 Audio after user interaction!');
           hasAudioPermission = true;
           chrome.storage.sync.set({ audioPermission: true });
+          
+          // Send success message
+          sendStatusMessage('AUDIO_UNLOCKED', { 
+            method: 'HTML5 Audio',
+            interactionType: event.type,
+            success: true
+          });
           
           // Remove event listeners - we're done
           ['click', 'keydown', 'touchstart', 'scroll', 'mousemove'].forEach(eventType => {
@@ -454,22 +468,31 @@
         // Re-initialize audio context for this session
         try {
           audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          console.log('[X Auto Scroll] Audio context created, initial state:', audioContext.state);
+          
           if (audioContext.state === 'suspended') {
-            audioContext.resume();
+            console.log('[X Auto Scroll] ❌ Audio context is suspended - browser requires user interaction after page refresh');
+            hasAudioPermission = false; // Reset permission since browser is blocking
+            chrome.storage.sync.set({ audioPermission: false }); // Update storage
+            setupUserInteractionDetection(); // Set up listeners for user interaction
+          } else {
+            console.log('[X Auto Scroll] ✅ Audio context ready from stored permission');
           }
-          console.log('[X Auto Scroll] Audio context re-initialized from stored permission');
         } catch (e) {
           console.log('[X Auto Scroll] Audio context re-initialization failed:', e);
           hasAudioPermission = false;
-          requestAudioPermission();
+          setupUserInteractionDetection();
         }
       } else {
         // Request audio permission with user-friendly prompt
         requestAudioPermission();
+        // Also set up user interaction detection as fallback
+        setupUserInteractionDetection();
       }
     } catch (e) {
       console.log('[X Auto Scroll] Failed to check audio permission:', e);
       requestAudioPermission();
+      setupUserInteractionDetection();
     }
   };
 
@@ -752,7 +775,7 @@
     // Check for "pokemon center queue" or "Costco queue" in the first 4 panels only
     for (const panel of panels) {
       const panelText = panel.element.textContent || panel.element.innerText || '';
-      if (panelText.toLowerCase().includes('pokemon center queue')) {
+      if (panelText.toLowerCase().includes('pokemon center queue') || panelText.toLowerCase().includes('pokemon center')) {
         console.log(`[X Auto Scroll] Found "pokemon center queue" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('POKEMON_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),

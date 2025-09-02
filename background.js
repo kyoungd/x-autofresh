@@ -2,7 +2,7 @@
 console.log('[X Auto Scroll Background] Service worker starting...');
 
 // Configuration flags
-const DEBUG_PRINT = false; // Set to true for verbose logging
+const DEBUG_PRINT = true; // Set to true for verbose logging
 
 // Track active tabs and their status
 const tabStatus = new Map();
