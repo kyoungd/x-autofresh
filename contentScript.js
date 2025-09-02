@@ -128,9 +128,8 @@
       let currentY = startY;
       
       const doScrollChunk = () => {
-        const remainingDistance = isScrollingUp ? 
-          Math.abs(currentY - targetY) : 
-          Math.abs(targetY - currentY);
+        // Use consistent distance calculation
+        const remainingDistance = Math.abs(targetY - currentY);
         
         if (remainingDistance <= 10) {
           // Final adjustment to exact target
@@ -153,8 +152,8 @@
         const baseChunkSize = Math.random() * 100 + 150; // 150-250px
         const chunkSize = Math.min(baseChunkSize, remainingDistance);
         
-        // Direction
-        const scrollDirection = isScrollingUp ? -1 : 1;
+        // Direction - move toward target
+        const scrollDirection = targetY > currentY ? 1 : -1;
         const newY = currentY + (chunkSize * scrollDirection);
         
         // Create and dispatch wheel event
@@ -168,17 +167,11 @@
         
         document.dispatchEvent(wheelEvent);
         
-        // Actually scroll
-        if (!isScrollingUp || newY >= 0) {
-          window.scrollTo(0, Math.max(0, newY));
-          currentY = Math.max(0, newY);
-        } else {
-          // Allow negative attempt for bounce effect
-          window.scrollTo(0, newY);
-          currentY = newY;
-        }
+        // Actually scroll - always update currentY to track intended position
+        window.scrollTo(0, Math.max(0, newY));
+        currentY = newY; // Track intended position even if browser clamps to 0
         
-        console.log(`[X Auto Scroll] Scrolled ${chunkSize.toFixed(0)}px ${isScrollingUp ? 'up' : 'down'} (now at ${currentY}px)`);
+        console.log(`[X Auto Scroll] Scrolled ${chunkSize.toFixed(0)}px ${scrollDirection > 0 ? 'down' : 'up'} (intended: ${currentY}px, actual: ${window.pageYOffset}px)`);
         
         // Random pause between chunks (300-1200ms)
         const pauseDuration = Math.random() * 900 + 300;
