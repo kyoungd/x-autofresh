@@ -772,10 +772,10 @@
       .sort((a, b) => a.translateY - b.translateY)
       .slice(0, 3); // Only check first 3 panels (lowest translateY values)
 
-    // Check for "pokemon center queue" or "Costco queue" in the first 4 panels only
+    // Check for "pokemon center queue" or "Costco queue" in the first 3 panels only
     for (const panel of panels) {
       const panelText = panel.element.textContent || panel.element.innerText || '';
-      if (panelText.toLowerCase().includes('pokemon center queue') || panelText.toLowerCase().includes('pokemon center')) {
+      if (panelText.toLowerCase().includes('pokemon center queue')) {
         console.log(`[X Auto Scroll] Found "pokemon center queue" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('POKEMON_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
