@@ -814,7 +814,7 @@
         playAlert();
         return true;
       }
-      if (panelText.toLowerCase().includes('queue live at costco') || panelText.toLowerCase().includes('is up at costco')) {
+      if (panelText.toLowerCase().includes('at costco')) {
         console.log(`[X Auto Scroll] Found "queue live at costco" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('COSTCO_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
@@ -823,7 +823,7 @@
         playAlert();
         return true;
       }
-      if (panelText.toLowerCase().includes('is up at target')) {
+      if (panelText.toLowerCase().includes('at target')) {
         console.log(`[X Auto Scroll] Found "queue live at target" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('TARGET_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
