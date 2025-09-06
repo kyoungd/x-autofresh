@@ -822,8 +822,9 @@
         playAlert();
         return true;
       }
-      if (panelText.toLowerCase().includes('at costco')) {
-        console.log(`[X Auto Scroll] Found "queue live at costco" in panel at translateY(${panel.translateY}px) - playing alert`);
+      if ((panelText.toLowerCase().includes('queue') && panelText.toLowerCase().includes('at costco')) ||
+          (panelText.toLowerCase().includes('at costco') && panelText.toLowerCase().includes('queue'))) {
+        console.log(`[X Auto Scroll] Found Costco queue text in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('COSTCO_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
           panelPosition: panel.translateY 
