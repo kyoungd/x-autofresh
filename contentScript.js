@@ -51,7 +51,7 @@
     const minutes = pacificTime.getMinutes();
     
     // 8:00 AM - 12:00 PM PST (8-12 hours)
-    const morningSession = hours >= 8 && hours < 12;
+    const morningSession = hours >= 8 && hours < 23;
     
     // 11:30 PM - 1:30 AM PST (11:30 PM-1:30 AM)
     const afternoonSession = (hours === 23 && minutes >= 30) || hours === 0 || (hours === 1 && minutes <= 30);
@@ -138,14 +138,17 @@
           // We've been stuck for 2+ iterations, assume we hit boundary
           if (isScrollingUp && actualY === 0) {
             console.log(`[X Auto Scroll] Hit top boundary, triggering bounce effect`);
-            // For upward scrolling beyond 0, let it try to go negative (browser will clamp to 0)
-            window.scrollTo(0, targetY);
-            // Then add a small bounce back
+            // Create bounce effect: small scroll down then back to 0
+            const bounceDistance = Math.abs(targetY * 0.1); // Small bounce based on overshoot
             setTimeout(() => {
-              window.scrollTo(0, Math.abs(targetY * 0.1)); // Small bounce
-              setTimeout(() => window.scrollTo(0, 0), 100); // Settle at 0
+              console.log(`[X Auto Scroll] Bouncing down ${bounceDistance}px`);
+              window.scrollTo(0, bounceDistance);
+              setTimeout(() => {
+                console.log(`[X Auto Scroll] Settling back to top (0)`);
+                window.scrollTo(0, 0);
+                resolve();
+              }, 100);
             }, 50);
-            resolve();
             return;
           }
         }
@@ -157,16 +160,21 @@
           // Final adjustment to exact target
           if (!isScrollingUp || targetY >= 0) {
             window.scrollTo(0, targetY);
+            resolve();
           } else {
-            // For upward scrolling beyond 0, let it try to go negative (browser will clamp to 0)
-            window.scrollTo(0, targetY);
-            // Then add a small bounce back
+            // For upward scrolling beyond 0, create bounce effect
+            console.log(`[X Auto Scroll] Creating bounce effect for negative target ${targetY}`);
+            const bounceDistance = Math.abs(targetY * 0.1); // Small bounce
             setTimeout(() => {
-              window.scrollTo(0, Math.abs(targetY * 0.1)); // Small bounce
-              setTimeout(() => window.scrollTo(0, 0), 100); // Settle at 0
+              console.log(`[X Auto Scroll] Bouncing down ${bounceDistance}px`);
+              window.scrollTo(0, bounceDistance);
+              setTimeout(() => {
+                console.log(`[X Auto Scroll] Settling back to top (0)`);
+                window.scrollTo(0, 0);
+                resolve();
+              }, 100);
             }, 50);
           }
-          resolve();
           return;
         }
         
@@ -201,9 +209,9 @@
         }
         lastActualY = newActualY;
         
-        // Update currentY - for upward scrolling to negative targets, stop at 0
-        if (isScrollingUp && targetY < 0 && newActualY === 0) {
-          currentY = 0; // Don't track beyond what browser can do
+        // Update currentY - for upward scrolling, use actual position when at boundaries
+        if (isScrollingUp && newActualY === 0) {
+          currentY = 0; // We're at the top, update tracking accordingly
         } else {
           currentY = newY;
         }
