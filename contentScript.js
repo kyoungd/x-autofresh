@@ -822,8 +822,7 @@
         playAlert();
         return true;
       }
-      if ((panelText.toLowerCase().includes('queue') && panelText.toLowerCase().includes('at costco')) ||
-          (panelText.toLowerCase().includes('at costco') && panelText.toLowerCase().includes('queue'))) {
+      if (panelText.toLowerCase().includes('queue') && panelText.toLowerCase().includes('at costco')) {
         console.log(`[X Auto Scroll] Found Costco queue text in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('COSTCO_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
