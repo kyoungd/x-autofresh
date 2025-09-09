@@ -813,7 +813,7 @@
     // Check for "pokemon center queue" or "Costco queue" in the first 3 panels only
     for (const panel of panels) {
       const panelText = panel.element.textContent || panel.element.innerText || '';
-      if (panelText.toLowerCase().includes('pokemon center queue')) {
+      if (panelText.toLowerCase().includes('pokemon center queue') || panelText.includes('pokémon center queue')) {
         console.log(`[X Auto Scroll] Found "pokemon center queue" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('POKEMON_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
@@ -822,7 +822,7 @@
         playAlert();
         return true;
       }
-      if (panelText.toLowerCase().includes('queue') && panelText.toLowerCase().includes('at costco')) {
+      if (panelText.toLowerCase().includes('at costco')) {
         console.log(`[X Auto Scroll] Found Costco queue text in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('COSTCO_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
