@@ -814,7 +814,8 @@
     for (const panel of panels) {
       const panelText = panel.element.textContent || panel.element.innerText || '';
       const ptLowerCase = panelText.toLowerCase();
-      if (/pok[eé]mon center .* queue/.test(ptLowerCase) || /queue .* pok[eé]mon center/.test(ptLowerCase)) {
+      console.log(ptLowerCase);
+      if (/pok[eé]mon center\s*queue/i.test(ptLowerCase) || /queue .* pok[eé]mon center/.test(ptLowerCase)) {
         console.log(`[X Auto Scroll] Found "pokemon center queue" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('POKEMON_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
