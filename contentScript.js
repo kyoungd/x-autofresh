@@ -51,7 +51,7 @@
     const minutes = pacificTime.getMinutes();
     
     // 8:00 AM - 12:00 PM PST (8-12 hours)
-    const morningSession = hours >= 8 && hours < 23;
+    const morningSession = hours >= 7 && hours < 23;
     
     // 11:30 PM - 1:30 AM PST (11:30 PM-1:30 AM)
     const afternoonSession = (hours === 23 && minutes >= 30) || hours === 0 || (hours === 1 && minutes <= 30);
@@ -813,7 +813,8 @@
     // Check for "pokemon center queue" or "Costco queue" in the first 3 panels only
     for (const panel of panels) {
       const panelText = panel.element.textContent || panel.element.innerText || '';
-      if (panelText.toLowerCase().includes('pokemon center queue') || panelText.includes('pokémon center queue')) {
+      const ptLowerCase = panelText.toLowerCase();
+      if (/pok[eé]mon center .* queue/.test(ptLowerCase) || /queue .* pok[eé]mon center/.test(ptLowerCase)) {
         console.log(`[X Auto Scroll] Found "pokemon center queue" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('POKEMON_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
@@ -822,7 +823,7 @@
         playAlert();
         return true;
       }
-      if (panelText.toLowerCase().includes('at costco')) {
+      if (ptLowerCase.includes('at costco')) {
         console.log(`[X Auto Scroll] Found Costco queue text in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('COSTCO_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
@@ -831,7 +832,7 @@
         playAlert();
         return true;
       }
-      if (panelText.toLowerCase().includes('at target')) {
+      if (ptLowerCase.includes('at target') || ptLowerCase.includes('target.com/p')) {
         console.log(`[X Auto Scroll] Found "queue live at target" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('TARGET_QUEUE_DETECTED', { 
           timestamp: new Date().toISOString(),
