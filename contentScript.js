@@ -793,6 +793,7 @@
 
   // check for "pokemon center queue" text
   const checkForPokemonQueue = () => {
+
     // Find all div elements with translateY transform (these are the info panels)
     const panels = Array.from(document.querySelectorAll('div[data-testid="cellInnerDiv"]'))
       .filter(div => {
@@ -810,11 +811,20 @@
       .sort((a, b) => a.translateY - b.translateY)
       .slice(0, 3); // Only check first 3 panels (lowest translateY values)
 
+    const SKIP_STRINGS = [
+      'plush is up at target'
+    ];
     // Check for "pokemon center queue" or "Costco queue" in the first 3 panels only
     for (const panel of panels) {
       const panelText = panel.element.textContent || panel.element.innerText || '';
       const ptLowerCase = panelText.toLowerCase();
       console.log(ptLowerCase);
+
+      // Skip panel if it matches any skip strings
+      if (SKIP_STRINGS.some(skipString => ptLowerCase.includes(skipString))) {
+        console.log(`[X Auto Scroll] Skipping panel containing: ${SKIP_STRINGS.find(skipString => ptLowerCase.includes(skipString))}`);
+        continue;
+      }
       if (/pok[eé]mon center\s*queue/i.test(ptLowerCase) || /queue .* pok[eé]mon center/.test(ptLowerCase)) {
         console.log(`[X Auto Scroll] Found "pokemon center queue" in panel at translateY(${panel.translateY}px) - playing alert`);
         sendStatusMessage('POKEMON_QUEUE_DETECTED', { 
