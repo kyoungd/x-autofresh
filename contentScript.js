@@ -238,8 +238,8 @@
     // Simulate mouse movement for 10-15 seconds
     await simulateMouseMovement(mouseDuration);
     
-    // Random scroll distance between 600-2400px
-    const scrollDistance = Math.floor(Math.random() * 1801) + 600; // 600-2400px
+    // Random scroll distance between 500-1200px
+    const scrollDistance = Math.floor(Math.random() * 701) + 500; // 500-1200px
     const targetY = currentY + scrollDistance;
     
     console.log(`[X Auto Scroll] Keep-alive micro scroll: scrolling down ${scrollDistance}px`);
@@ -276,7 +276,7 @@
   // Start random keep-alive scrolling (only during active hours)
   const startKeepAlive = () => {
     const scheduleNextKeepAlive = () => {
-      const nextInterval = randomBetween(3 * 60 * 1000, 7 * 60 * 1000); // 3-7 minutes in ms
+      const nextInterval = randomBetween(5 * 60 * 1000, 9 * 60 * 1000); // 5-9 minutes in ms
       console.log(`[X Auto Scroll] Next keep-alive scroll in ${Math.round(nextInterval / 60000)} minutes`);
       
       keepAliveInterval = setTimeout(() => {
