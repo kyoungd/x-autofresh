@@ -276,7 +276,7 @@
   // Start random keep-alive scrolling (only during active hours)
   const startKeepAlive = () => {
     const scheduleNextKeepAlive = () => {
-      const nextInterval = randomBetween(5 * 60 * 1000, 9 * 60 * 1000); // 5-9 minutes in ms
+      const nextInterval = randomBetween(2 * 60 * 1000, 3 * 60 * 1000); // 2-3 minutes in ms
       console.log(`[X Auto Scroll] Next keep-alive scroll in ${Math.round(nextInterval / 60000)} minutes`);
       
       keepAliveInterval = setTimeout(() => {
